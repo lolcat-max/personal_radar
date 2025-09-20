@@ -241,7 +241,7 @@ void processVolumetricMath(wifi_csi_info_t *data) {
         Serial.println("3D Volumetric WiFi Radar is now ACTIVE!");
         Serial.println("Move around to see motion detection...");
         Serial.println("======================================\n");
-        printCalibrationSummary();
+        //printCalibrationSummary();
     }
 }
 
@@ -282,7 +282,6 @@ void performSpatialAnalysis(int subcarrier_idx, int rssi, float frequency, float
     
     String motion_type = classifyMotion(velocity, radar.amplitude_variance[subcarrier_idx]);
     
-    Serial.printf("=== 3D MOTION DETECTED ===\n");
     Serial.printf("Subcarrier: %d (%.1f MHz)\n", subcarrier_idx, frequency / 1000000.0);
     Serial.printf("Distance: %.2f m\n", distance);
     Serial.printf("Velocity: %.2f m/s\n", velocity);
@@ -290,7 +289,6 @@ void performSpatialAnalysis(int subcarrier_idx, int rssi, float frequency, float
     Serial.printf("3D Position: (%.2f, %.2f, %.2f) m\n", x, y, z);
     Serial.printf("Motion Type: %s\n", motion_type.c_str());
     Serial.printf("RSSI: %d dBm\n", rssi);
-    Serial.println("==========================\n");
 }
 
 float calculateAngleOfArrival(int subcarrier_idx, float amplitude_variance) {
@@ -391,7 +389,7 @@ void printCalibrationSummary() {
         Serial.printf("SC%d: Amp=%.2f, Phase=%.3f rad\n", 
                      i, radar.amplitude_baseline[i], radar.phase_baseline[i]);
     }
-    Serial.println("============================\n");
+    //Serial.println("============================\n");
 }
 
 void generateCSIPing() {
@@ -433,7 +431,7 @@ void loop() {
     generateCSIPing();
     
     // Print status periodically
-    printRadarStatus();
+    //printRadarStatus();
     
     delay(1000);
 }
