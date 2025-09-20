@@ -282,13 +282,13 @@ void performSpatialAnalysis(int subcarrier_idx, int rssi, float frequency, float
     
     String motion_type = classifyMotion(velocity, radar.amplitude_variance[subcarrier_idx]);
     
-    Serial.printf("Subcarrier: %d (%.1f MHz)\n", subcarrier_idx, frequency / 1000000.0);
+    //Serial.printf("Subcarrier: %d (%.1f MHz)\n", subcarrier_idx, frequency / 1000000.0);
     Serial.printf("Distance: %.2f m\n", distance);
     Serial.printf("Velocity: %.2f m/s\n", velocity);
     Serial.printf("Angle: %.1f°\n", angle);
-    Serial.printf("3D Position: (%.2f, %.2f, %.2f) m\n", x, y, z);
-    Serial.printf("Motion Type: %s\n", motion_type.c_str());
-    Serial.printf("RSSI: %d dBm\n", rssi);
+    //Serial.printf("3D Position: (%.2f, %.2f, %.2f) m\n", x, y, z);
+    //Serial.printf("Motion Type: %s\n", motion_type.c_str());
+    //Serial.printf("RSSI: %d dBm\n", rssi);
 }
 
 float calculateAngleOfArrival(int subcarrier_idx, float amplitude_variance) {
