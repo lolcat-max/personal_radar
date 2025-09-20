@@ -435,5 +435,5 @@ void loop() {
     // Print status periodically
     printRadarStatus();
     
-    delay(250);
+    delay(1000);
 }
