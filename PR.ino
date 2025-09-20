@@ -2,8 +2,8 @@
 #include <esp_wifi.h>
 #include <math.h>
 
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
+const char* ssid = "";
+const char* password = "";
 
 // Mathematical constants for CSI calculations
 #define PI 3.14159265359
@@ -32,114 +32,149 @@ void setup() {
     Serial.begin(115200);
     delay(3000);
     
-    Serial.println("ESP32-S3 Volumetric WiFi Radar with Full Math Processing");
+    Serial.println("ESP32-S3 WiFi Connection Status 6 Fix");
     
-    // Initialize WiFi with proper type handling
-    initializeWiFiConnection();
-    
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("WiFi Connected - Initializing CSI Math Engine...");
-        initializeCSIMath();
-    }
+    // Critical fixes for WL_CONNECT_FAILED (Status 6)
+    fixWiFiConnectionStatus6();
 }
 
-void initializeWiFiConnection() {
+void fixWiFiConnectionStatus6() {
+    Serial.println("Applying Status 6 fixes...");
+    
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
+    delay(2000);
+    
+    esp_wifi_restore();
     delay(1000);
     
     WiFi.mode(WIFI_STA);
-    WiFi.setAutoReconnect(false);
     WiFi.persistent(false);
     esp_wifi_set_ps(WIFI_PS_NONE);
     
-    Serial.printf("Connecting to: %s\n", ssid);
-    WiFi.begin(ssid, password);
+    Serial.println("Scanning for network...");
+    int n = WiFi.scanNetworks();
+    bool networkFound = false;
+    int networkChannel = 0;
     
-    // Fix: Cast waitForConnectResult to wl_status_t
-    wl_status_t result = (wl_status_t)WiFi.waitForConnectResult(15000);
-    
-    if (result == WL_CONNECTED) {
-        Serial.println("WiFi Connected!");
-        Serial.printf("IP: %s, RSSI: %d dBm\n", 
-                     WiFi.localIP().toString().c_str(), WiFi.RSSI());
-        WiFi.setAutoReconnect(true);
-    } else {
-        Serial.printf("Connection failed with status: %d\n", result);
-        Serial.println("Trying alternative connection method...");
-        alternativeConnection();
+    for (int i = 0; i < n; i++) {
+        if (WiFi.SSID(i) == String(ssid)) {
+            networkFound = true;
+            networkChannel = WiFi.channel(i);
+            Serial.printf("Found network: %s\n", ssid);
+            Serial.printf("Channel: %d, RSSI: %d dBm\n", networkChannel, WiFi.RSSI(i));
+            Serial.printf("Encryption: %d\n", WiFi.encryptionType(i));
+            break;
+        }
     }
-}
-
-void alternativeConnection() {
-    // Alternative connection without waitForConnectResult
-    WiFi.disconnect();
-    delay(1000);
     
-    WiFi.mode(WIFI_STA);
+    if (!networkFound) {
+        Serial.println("ERROR: Network not found!");
+        Serial.println("Available networks:");
+        for (int i = 0; i < min(n, 10); i++) {
+            Serial.printf("  %s (RSSI: %d)\n", WiFi.SSID(i).c_str(), WiFi.RSSI(i));
+        }
+        return;
+    }
+    
+    if (networkChannel > 0) {
+        esp_wifi_set_channel(networkChannel, WIFI_SECOND_CHAN_NONE);
+        Serial.printf("Set to channel %d\n", networkChannel);
+    }
+    
+    Serial.printf("Password length: %d characters\n", strlen(password));
+    Serial.println("Attempting connection...");
     WiFi.begin(ssid, password);
     
-    // Use WiFi.status() with proper casting instead
+    unsigned long startTime = millis();
     int attempts = 0;
-    wl_status_t status;
     
-    while (attempts < 30) {
-        status = WiFi.status();  // This returns wl_status_t directly
+    while (WiFi.status() != WL_CONNECTED && (millis() - startTime) < 30000) {
+        attempts++;
+        delay(2000);
         
-        if (status == WL_CONNECTED) {
-            Serial.println("Alternative connection successful!");
-            Serial.printf("IP: %s\n", WiFi.localIP().toString().c_str());
+        wl_status_t status = WiFi.status();
+        Serial.printf("Attempt %d: Status = %d ", attempts, status);
+        
+        switch(status) {
+            case WL_IDLE_STATUS:     Serial.println("(Idle)"); break;
+            case WL_NO_SSID_AVAIL:   Serial.println("(No SSID)"); break;
+            case WL_SCAN_COMPLETED:  Serial.println("(Scan complete)"); break;
+            case WL_CONNECTED:       Serial.println("(Connected)"); break;
+            case WL_CONNECT_FAILED:  Serial.println("(Connect failed)"); break;
+            case WL_CONNECTION_LOST: Serial.println("(Connection lost)"); break;
+            case WL_DISCONNECTED:    Serial.println("(Disconnected)"); break;
+            default:                 Serial.printf("(Unknown: %d)\n", status); break;
+        }
+        
+        if (status == WL_CONNECT_FAILED) {
+            Serial.println("Status 6 detected - trying password fixes...");
+            tryPasswordVariations();
             return;
         }
-        
-        Serial.printf("Attempt %d: Status %d\n", attempts + 1, status);
-        delay(1000);
-        attempts++;
-        
-        // Force reconnect every 10 attempts
-        if (attempts % 10 == 0) {
-            Serial.println("Forcing reconnect...");
-            WiFi.disconnect();
-            delay(2000);
-            WiFi.begin(ssid, password);
-        }
     }
     
-    Serial.println("All connection attempts failed");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\n=== CONNECTION SUCCESSFUL ===");
+        Serial.printf("IP Address: %s\n", WiFi.localIP().toString().c_str());
+        Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
+        Serial.println("============================");
+        
+        // Initialize complete CSI radar system
+        initializeCompleteCSI();
+    } else {
+        Serial.println("Connection failed - trying alternative methods...");
+        tryAlternativeMethods();
+    }
 }
 
-void initializeCSIMath() {
-    // Configure CSI with mathematical precision requirements
+void initializeCompleteCSI() {
+    Serial.println("Initializing complete CSI radar system...");
+    
+    // Configure CSI with full mathematical precision
     wifi_csi_config_t csi_config = {
-        .lltf_en = true,           
-        .htltf_en = true,          
-        .stbc_htltf2_en = true,    
-        .ltf_merge_en = true,      
-        .channel_filter_en = false, 
-        .manu_scale = 0,           
-        .shift = 0,                
+        .lltf_en = true,
+        .htltf_en = true,
+        .stbc_htltf2_en = true,
+        .ltf_merge_en = true,
+        .channel_filter_en = false,
+        .manu_scale = 0,
+        .shift = 0,
     };
     
     esp_err_t ret = esp_wifi_set_csi_config(&csi_config);
     if (ret == ESP_OK) {
+        // Set the callback function
         esp_wifi_set_csi_rx_cb(&csi_math_callback, NULL);
         esp_wifi_set_csi(true);
         
-        // Initialize mathematical baseline
+        // Initialize radar data structure
         radar.baseline_calibrated = false;
         radar.sample_count = 0;
         radar.last_timestamp = micros();
         
-        Serial.println("CSI Mathematical Engine Initialized");
-        Serial.println("Calibrating baseline - please remain stationary...");
+        // Clear all arrays
+        for (int i = 0; i < MAX_SUBCARRIERS; i++) {
+            radar.amplitude_baseline[i] = 0.0;
+            radar.phase_baseline[i] = 0.0;
+            radar.amplitude_variance[i] = 0.0;
+            radar.phase_variance[i] = 0.0;
+            radar.distance_estimates[i] = 0.0;
+            radar.doppler_shift[i] = 0.0;
+        }
+        
+        Serial.println("CSI Mathematical Engine Initialized Successfully!");
+        Serial.println("Calibrating baseline - please remain stationary for 10 seconds...");
     } else {
-        Serial.printf("CSI initialization failed: %d\n", ret);
+        Serial.printf("CSI initialization failed with error: %d\n", ret);
+        Serial.println("Continuing with basic WiFi monitoring...");
     }
 }
 
 void ARDUINO_ISR_ATTR csi_math_callback(void *ctx, wifi_csi_info_t *data) {
     if (!data || !data->buf || data->len < 4) return;
     
+    // Process the CSI data
     processVolumetricMath(data);
 }
 
@@ -149,28 +184,23 @@ void processVolumetricMath(wifi_csi_info_t *data) {
     unsigned long current_time = micros();
     float time_delta = (current_time - radar.last_timestamp) / 1000000.0;
     
-    // Process each subcarrier with full mathematical analysis
+    // Process each subcarrier
     for (int i = 0; i < num_subcarriers; i++) {
         // Extract I/Q components
         int8_t I = csi_raw[i * 2 + 1];     // Real component
         int8_t Q = csi_raw[i * 2];         // Imaginary component
         
-        // Calculate complex amplitude and phase
+        // Calculate amplitude and phase
         float amplitude = sqrt(I * I + Q * Q);
-        float phase = atan2(Q, I);         
-        
-        // Subcarrier frequency calculation
-        float subcarrier_freq = WIFI_CENTER_FREQ + (i * SUBCARRIER_SPACING);
-        float wavelength = LIGHT_SPEED / subcarrier_freq;
+        float phase = atan2(Q, I);
         
         // Baseline calibration phase
         if (radar.sample_count < BASELINE_SAMPLES) {
             radar.amplitude_baseline[i] += amplitude / BASELINE_SAMPLES;
             radar.phase_baseline[i] += phase / BASELINE_SAMPLES;
         }
-        // Volumetric detection and analysis
+        // Motion detection phase
         else if (radar.baseline_calibrated) {
-            // Calculate amplitude and phase deviations
             float amp_deviation = amplitude - radar.amplitude_baseline[i];
             float phase_deviation = phase - radar.phase_baseline[i];
             
@@ -178,22 +208,23 @@ void processVolumetricMath(wifi_csi_info_t *data) {
             if (phase_deviation > PI) phase_deviation -= 2 * PI;
             if (phase_deviation < -PI) phase_deviation += 2 * PI;
             
-            // Calculate variance for motion detection
+            // Update variance
             radar.amplitude_variance[i] = updateVariance(radar.amplitude_variance[i], 
                                                         amp_deviation, radar.sample_count);
             radar.phase_variance[i] = updateVariance(radar.phase_variance[i], 
                                                    phase_deviation, radar.sample_count);
             
-            // Distance estimation using phase information
+            // Calculate distance and velocity
+            float subcarrier_freq = WIFI_CENTER_FREQ + (i * SUBCARRIER_SPACING);
+            float wavelength = LIGHT_SPEED / subcarrier_freq;
             radar.distance_estimates[i] = calculateDistance(phase_deviation, wavelength);
             
-            // Doppler shift calculation
             if (time_delta > 0) {
                 float phase_rate = phase_deviation / time_delta;
                 radar.doppler_shift[i] = (phase_rate * wavelength) / (4 * PI);
             }
             
-            // 3D Volumetric Motion Detection
+            // Detect motion
             if (detectVolumetricMotion(i, amp_deviation, phase_deviation)) {
                 performSpatialAnalysis(i, data->rx_ctrl.rssi, subcarrier_freq, time_delta);
             }
@@ -206,14 +237,15 @@ void processVolumetricMath(wifi_csi_info_t *data) {
     // Complete baseline calibration
     if (radar.sample_count == BASELINE_SAMPLES && !radar.baseline_calibrated) {
         radar.baseline_calibrated = true;
-        Serial.println("Mathematical baseline calibration complete!");
-        Serial.println("3D Volumetric radar active with full spatial analysis");
+        Serial.println("\n=== BASELINE CALIBRATION COMPLETE ===");
+        Serial.println("3D Volumetric WiFi Radar is now ACTIVE!");
+        Serial.println("Move around to see motion detection...");
+        Serial.println("======================================\n");
         printCalibrationSummary();
     }
 }
 
 float updateVariance(float current_variance, float new_value, int sample_count) {
-    // Online variance calculation using Welford's algorithm
     if (sample_count <= BASELINE_SAMPLES) return 0.0;
     
     float delta = new_value * new_value;
@@ -221,13 +253,11 @@ float updateVariance(float current_variance, float new_value, int sample_count) 
 }
 
 float calculateDistance(float phase_deviation, float wavelength) {
-    // Distance estimation using phase shift
     float distance = (fabs(phase_deviation) * wavelength) / (4.0 * PI);
     return distance;
 }
 
 bool detectVolumetricMotion(int subcarrier_idx, float amp_dev, float phase_dev) {
-    // Multi-threshold motion detection
     float amp_threshold = 2.0 + (0.1 * subcarrier_idx);
     float phase_threshold = 0.3 + (0.01 * subcarrier_idx);
     float variance_threshold = 1.5;
@@ -244,19 +274,15 @@ void performSpatialAnalysis(int subcarrier_idx, int rssi, float frequency, float
     float doppler = radar.doppler_shift[subcarrier_idx];
     float velocity = fabs(doppler);
     
-    // Angle estimation based on subcarrier response pattern
     float angle = calculateAngleOfArrival(subcarrier_idx, radar.amplitude_variance[subcarrier_idx]);
     
-    // 3D position estimation
     float x = distance * cos(angle * PI / 180.0);
     float y = distance * sin(angle * PI / 180.0);
     float z = calculateVerticalPosition(frequency, rssi, distance);
     
-    // Motion classification
     String motion_type = classifyMotion(velocity, radar.amplitude_variance[subcarrier_idx]);
     
-    // Output comprehensive spatial analysis
-    Serial.printf("=== 3D VOLUMETRIC DETECTION ===\n");
+    Serial.printf("=== 3D MOTION DETECTED ===\n");
     Serial.printf("Subcarrier: %d (%.1f MHz)\n", subcarrier_idx, frequency / 1000000.0);
     Serial.printf("Distance: %.2f m\n", distance);
     Serial.printf("Velocity: %.2f m/s\n", velocity);
@@ -264,8 +290,7 @@ void performSpatialAnalysis(int subcarrier_idx, int rssi, float frequency, float
     Serial.printf("3D Position: (%.2f, %.2f, %.2f) m\n", x, y, z);
     Serial.printf("Motion Type: %s\n", motion_type.c_str());
     Serial.printf("RSSI: %d dBm\n", rssi);
-    Serial.printf("Doppler Shift: %.3f Hz\n", doppler);
-    Serial.println("================================\n");
+    Serial.println("==========================\n");
 }
 
 float calculateAngleOfArrival(int subcarrier_idx, float amplitude_variance) {
@@ -288,54 +313,127 @@ String classifyMotion(float velocity, float amplitude_variance) {
     else return "Rapid motion";
 }
 
+void tryPasswordVariations() {
+    Serial.println("Trying common password issues...");
+    
+    // Common password problems that cause Status 6:
+    String passwords[] = {
+        String(password),           // Original
+        String(password) + " ",     // Extra space
+        String(password).substring(0, strlen(password)-1), // Missing last char
+        " " + String(password),     // Leading space
+    };
+    
+    for (int i = 0; i < 4; i++) {
+        Serial.printf("Trying password variation %d (length: %d)\n", i+1, passwords[i].length());
+        
+        WiFi.disconnect();
+        delay(2000);
+        WiFi.begin(ssid, passwords[i].c_str());
+        
+        unsigned long start = millis();
+        while (WiFi.status() != WL_CONNECTED && (millis() - start) < 15000) {
+            delay(1000);
+            Serial.print(".");
+        }
+        
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.printf("\nPassword variation %d worked!\n", i+1);
+            Serial.printf("Correct password: '%s'\n", passwords[i].c_str());
+            return;
+        } else {
+            Serial.printf(" Failed (Status: %d)\n", WiFi.status());
+        }
+    }
+}
+
+void tryAlternativeMethods() {
+    Serial.println("Trying router compatibility fixes...");
+    
+    // Method 1: Try with specific WiFi config
+    wifi_config_t wifi_config = {};
+    strncpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
+    strncpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
+    
+    // Force WPA2 authentication
+    wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+    wifi_config.sta.pmf_cfg.capable = true;
+    wifi_config.sta.pmf_cfg.required = false;
+    
+    esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    
+    WiFi.begin();
+    
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED && (millis() - start) < 20000) {
+        delay(1000);
+        Serial.print(".");
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nRouter compatibility fix worked!");
+        Serial.printf("IP: %s\n", WiFi.localIP().toString().c_str());
+    } else {
+        Serial.println("\nAll methods failed. Check these:");
+        Serial.println("1. WiFi password is EXACTLY correct (case sensitive)");
+        Serial.println("2. Password is 8+ characters long");
+        Serial.println("3. Router is set to WPA2 (not WPA3)");
+        Serial.println("4. 2.4GHz band is enabled (not 5GHz only)");
+        Serial.println("5. Try moving closer to router");
+        Serial.println("6. Restart your router");
+        Serial.println("7. Check for hidden characters in SSID/password");
+    }
+}
+
 void printCalibrationSummary() {
-    Serial.println("\n=== CALIBRATION SUMMARY ===");
+    Serial.println("=== CALIBRATION SUMMARY ===");
     for (int i = 0; i < min(8, MAX_SUBCARRIERS); i++) {
-        Serial.printf("SC%d: Amp_baseline=%.2f, Phase_baseline=%.3f rad\n", 
+        Serial.printf("SC%d: Amp=%.2f, Phase=%.3f rad\n", 
                      i, radar.amplitude_baseline[i], radar.phase_baseline[i]);
     }
     Serial.println("============================\n");
 }
 
-void loop() {
-    // Connection monitoring
-    if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("WiFi connection lost - restarting...");
-        ESP.restart();
-    }
-    
-    // Generate ping packets for CSI data
-    generateCSIPing();
-    
-    // Print periodic status
-    static unsigned long last_status = 0;
-    if (millis() - last_status > 10000) {
-        printRadarStatus();
-        last_status = millis();
-    }
-    
-    delay(100);
-}
-
 void generateCSIPing() {
-    WiFiClient client;
-    if (client.connect("8.8.8.8", 53)) {
-        client.print("GET / HTTP/1.1\r\n\r\n");
-        client.stop();
+    static unsigned long lastPing = 0;
+    if (millis() - lastPing > 500) {  // Ping every 500ms
+        WiFiClient client;
+        if (client.connect("8.8.8.8", 53)) {
+            client.print("GET / HTTP/1.1\r\n\r\n");
+            client.stop();
+        }
+        lastPing = millis();
     }
 }
 
 void printRadarStatus() {
-    if (!radar.baseline_calibrated) return;
-    
-    Serial.println("\n=== RADAR STATUS ===");
-    Serial.printf("Samples processed: %d\n", radar.sample_count);
-    Serial.printf("WiFi RSSI: %d dBm\n", WiFi.RSSI());
-    
-    for (int i = 0; i < 4; i++) {
-        Serial.printf("SC%d variance: A=%.2f, P=%.3f, D=%.2fm\n", 
-                     i, radar.amplitude_variance[i], radar.phase_variance[i], 
-                     radar.distance_estimates[i]);
+    static unsigned long lastStatus = 0;
+    if (millis() - lastStatus > 5000 && radar.baseline_calibrated) {  // Every 5 seconds
+        Serial.println("\n=== RADAR STATUS ===");
+        Serial.printf("Samples: %d, RSSI: %d dBm\n", radar.sample_count, WiFi.RSSI());
+        
+        for (int i = 0; i < 4; i++) {
+            Serial.printf("SC%d: A=%.2f, P=%.3f, D=%.2fm\n", 
+                         i, radar.amplitude_variance[i], radar.phase_variance[i], 
+                         radar.distance_estimates[i]);
+        }
+        Serial.println("===================\n");
+        lastStatus = millis();
     }
-    Serial.println("===================\n");
+}
+
+void loop() {
+    // Check WiFi connection
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi disconnected - restarting...");
+        ESP.restart();
+    }
+    
+    // Generate CSI data
+    generateCSIPing();
+    
+    // Print status periodically
+    printRadarStatus();
+    
+    delay(250);
 }
